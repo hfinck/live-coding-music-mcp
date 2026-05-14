@@ -288,8 +288,8 @@ Then ask Claude:
 | `stretch` | [DEPRECATED — use transform({ op: "stretch" }) instead] Time stretch pattern |
 | `quantize` | [DEPRECATED — use transform({ op: "quantize" }) instead] Quantize to grid |
 | `humanize` | [DEPRECATED — use transform({ op: "humanize" }) instead] Add human timing variation |
-| `add_effect` | Add effect to pattern |
-| `remove_effect` | Remove effect |
+| `add_effect` | [DEPRECATED — use effect({ action: "add" }) instead] Add effect to pattern |
+| `remove_effect` | [DEPRECATED — use effect({ action: "remove" }) instead] Remove effect |
 | `add_swing` | [DEPRECATED — use transform({ op: "swing" }) instead] Add swing to pattern |
 | `set_energy` | Adjust the overall energy level of the current pattern on a 0-10 scale. 0: minimal/ambient, 1-2: sparse, 3-4: light/relaxed, 5-6: normal/moderate, 7-8: driving/intense, 9-10: maximum. Auto-plays after applying energy level. |
 
@@ -376,6 +376,7 @@ Then ask Claude:
 | `playback` | Control transport on the current session.  |
 | `pattern_store` | Persist patterns to disk and read them back.  |
 | `transform` | Apply a single transform op to the current session pattern.  |
+| `effect` | Add or remove a Strudel effect on the current session pattern.  |
 
 </details>
 
