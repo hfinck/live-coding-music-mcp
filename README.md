@@ -299,8 +299,8 @@ Then ask Claude:
 
 | Tool | Description |
 |------|-------------|
-| `get_pattern_feedback` | Get AI-powered creative feedback on the current pattern using Google Gemini. Analyzes pattern structure and optionally audio. |
-| `jam_with` | AI generates a complementary layer to jam with your pattern. Analyzes current pattern to detect tempo, key, and existing layers, then generates a matching layer that fits musically. |
+| `get_pattern_feedback` | [DEPRECATED — use ai_assist({ task: "feedback" }) instead] Get AI-powered creative feedback on the current pattern using Google Gemini. |
+| `jam_with` | [DEPRECATED — use ai_assist({ task: "jam" }) instead] AI generates a complementary layer to jam with your pattern. |
 | `shift_mood` | [DEPRECATED — use shape({ dimension: "mood" }) instead] Transform current pattern to match a different emotional mood. Moods: dark, euphoric, melancholic, aggressive, dreamy, peaceful, energetic. |
 | `refine` | [DEPRECATED — use shape({ dimension: "refine" }) instead] Incrementally refine current pattern: faster/slower/louder/quieter/brighter/darker/"more reverb"/drier. |
 
@@ -366,7 +366,8 @@ Then ask Claude:
 
 | Tool | Description |
 |------|-------------|
-| `suggest_pattern_from_audio` | Analyze the currently playing audio and suggest a complementary Strudel pattern using Gemini AI. Extracts tempo, key, and spectral features locally, then uses AI to generate a matching pattern. Returns pattern text (not auto-executed). |
+| `ai_assist` | Gemini-backed pattern assistance.  |
+| `suggest_pattern_from_audio` | [DEPRECATED — use ai_assist({ task: "suggest" }) instead] Analyze playing audio and suggest a complementary Strudel pattern. |
 | `validate_pattern_local` | Validate pattern syntax against the in-process StrudelEngine (no browser required) |
 | `analyze_pattern_local` | Static analysis (events/cycle, complexity, optional BPM) without browser playback |
 | `query_pattern_events` | Enumerate events the pattern would emit between two cycle indices (max 16 cycles) |
