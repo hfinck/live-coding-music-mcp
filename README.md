@@ -264,7 +264,7 @@ Then ask Claude:
 | `generate_melody` | Generate melody from scale |
 | `generate_polyrhythm` | Generate polyrhythm |
 | `generate_fill` | Generate drum fill |
-| `generate_variation` | Create pattern variations |
+| `generate_variation` | [DEPRECATED — use transform({ op: "vary" }) instead] Create pattern variations (mis-named today; it transforms, not generates) |
 
 </details>
 
@@ -275,7 +275,7 @@ Then ask Claude:
 | `generate_scale` | Generate scale notes |
 | `generate_chord_progression` | Generate chord progression |
 | `generate_euclidean` | Generate Euclidean rhythm |
-| `apply_scale` | Apply scale to notes |
+| `apply_scale` | [DEPRECATED — use transform({ op: "scale" }) instead] Apply scale to notes |
 
 </details>
 
@@ -283,14 +283,14 @@ Then ask Claude:
 
 | Tool | Description |
 |------|-------------|
-| `transpose` | Transpose notes by semitones |
-| `reverse` | Reverse pattern |
-| `stretch` | Time stretch pattern |
-| `quantize` | Quantize to grid |
-| `humanize` | Add human timing variation |
+| `transpose` | [DEPRECATED — use transform({ op: "transpose" }) instead] Transpose notes by semitones |
+| `reverse` | [DEPRECATED — use transform({ op: "reverse" }) instead] Reverse pattern |
+| `stretch` | [DEPRECATED — use transform({ op: "stretch" }) instead] Time stretch pattern |
+| `quantize` | [DEPRECATED — use transform({ op: "quantize" }) instead] Quantize to grid |
+| `humanize` | [DEPRECATED — use transform({ op: "humanize" }) instead] Add human timing variation |
 | `add_effect` | Add effect to pattern |
 | `remove_effect` | Remove effect |
-| `add_swing` | Add swing to pattern |
+| `add_swing` | [DEPRECATED — use transform({ op: "swing" }) instead] Add swing to pattern |
 | `set_energy` | Adjust the overall energy level of the current pattern on a 0-10 scale. 0: minimal/ambient, 1-2: sparse, 3-4: light/relaxed, 5-6: normal/moderate, 7-8: driving/intense, 9-10: maximum. Auto-plays after applying energy level. |
 
 </details>
@@ -374,6 +374,7 @@ Then ask Claude:
 | `edit_pattern` | Mutate the current session pattern.  |
 | `history` | Navigate or inspect the pattern edit history.  |
 | `pattern_store` | Persist patterns to disk and read them back.  |
+| `transform` | Apply a single transform op to the current session pattern.  |
 
 </details>
 
