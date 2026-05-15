@@ -18,7 +18,7 @@
 
 A Model Context Protocol (MCP) server that drives [Strudel.cc](https://strudel.cc/) from Claude for AI-assisted live-coding music, pattern generation, and algorithmic composition.
 
-**Current State: Beta.** The core workflow (init → generate → write → play → analyze) works reliably with real audio output. 1771 tests pass, 86.76% statement coverage / 77.32% branch coverage. CI is hardened with OpenSSF Scorecard, SHA-pinned actions, CODEOWNERS, Dependabot, and lint as a blocking gate.
+**Current State: Beta.** The core workflow (init → compose → playback → analyze) works reliably with real audio output. 1709 tests pass, 86.32% statement coverage / 75.93% branch coverage. CI is hardened with OpenSSF Scorecard, SHA-pinned actions, CODEOWNERS, Dependabot, and lint as a blocking gate.
 
 **What "Beta" means here:**
 - Tool schemas are stable within minor versions; breaking changes require a major bump
@@ -30,8 +30,8 @@ A Model Context Protocol (MCP) server that drives [Strudel.cc](https://strudel.c
 
 - [Features](#features)
 - [Installation](#installation)
-- [Quick Reference](#quick-reference)
 - [Quick Start](#quick-start)
+- [Quick Reference](#quick-reference)
 - [Available Tools](#available-tools)
 - [Usage Examples](#usage-examples)
 - [Architecture](#architecture)
@@ -45,7 +45,7 @@ A Model Context Protocol (MCP) server that drives [Strudel.cc](https://strudel.c
 ## Features
 
 ### 🎹 Music control
-- **84 MCP tools** covering pattern editing, playback, audio analysis, generation, history, sessions, and Gemini-backed assists. 26 are the canonical consolidated tools (`pattern_store`, `edit_pattern`, `transform`, `analyze`, `history`, `playback`, `effect`, `shape`, `audio_capture`, `browser_window`, `generate_part`, `generate_rhythm`, `music_theory`, `session`, `ai_assist`, ...); the rest are deprecated aliases kept for one release ([#178](https://github.com/williamzujkowski/live-coding-music-mcp/issues/178)).
+- **26 MCP tools** covering pattern editing, playback, audio analysis, generation, history, sessions, and Gemini-backed assists. Each tool is enum-parameterized to keep the protocol surface small: `pattern_store({ action })`, `edit_pattern({ mode })`, `transform({ op })`, `analyze({ include })`, `history({ action })`, `playback({ action })`, `effect({ action })`, `shape({ dimension })`, `audio_capture({ action })`, `browser_window({ action })`, `generate_part({ role })`, `generate_rhythm({ type })`, `music_theory({ query })`, `session({ action })`, `ai_assist({ task })`, ... The 58 legacy single-verb aliases that forwarded to these were removed in v4.0.0 ([#178](https://github.com/williamzujkowski/live-coding-music-mcp/issues/178)).
 - **4 MCP resources** for catalog browsing without burning tool calls: `strudel://examples`, `strudel://patterns`, `strudel://styles`, `strudel://docs/tools`.
 - **Real browser automation** of Strudel.cc through Playwright.
 - **Multi-session support** — every browser-touching tool accepts an optional `session_id`; sessions have isolated browser pages, undo/redo/history stacks, and audio-capture services.
@@ -56,12 +56,12 @@ A Model Context Protocol (MCP) server that drives [Strudel.cc](https://strudel.c
 - **Result envelope** on every `tools/call`: clients branch on `{ ok, errorCategory, isRetryable }` instead of parsing free-text.
 
 ### 🔧 Testing & CI status
-- **1771 passing tests** across unit, integration, and example-validation suites.
-- **86.76% statement coverage / 77.32% branch coverage**.
+- **1709 passing tests** across unit, integration, and example-validation suites; 20 skipped (browser, gated by Playwright).
+- **86.32% statement coverage / 75.93% branch coverage**.
 - **Lint blocking in CI**: 0 errors, ~163 warnings (mostly `any` in test mocks).
 - **OIDC trusted publishing** to npm with SLSA build provenance attestation on every release.
 
-**Not Production-Ready:** This is experimental software under active development. Use for exploration and experimentation. Expect breaking changes, bugs, and incomplete features. See [CONTRIBUTING.md](CONTRIBUTING.md) to help improve it.
+**Not Production-Ready:** This is experimental software under active development. Use for exploration and experimentation. Expect breaking changes, bugs, and incomplete features. See [the Contributing section](#contributing) to help improve it.
 
 ### 🎼 Example patterns
 
@@ -151,9 +151,86 @@ npx playwright install chromium
 npm run build
 ```
 
+## Quick Start
+
+Get from install to your first generated pattern in under two minutes.
+
+### 1. Install
+
+```bash
+npm install -g @williamzujkowski/live-coding-music-mcp
+npx playwright install chromium   # one-time
+```
+
+Building from source instead? See [Installation → From Source](#from-source).
+
+### 2. Configure your MCP client
+
+#### Claude Desktop
+
+Edit your Claude Desktop config file:
+
+| OS | Config path |
+|---|---|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Linux | `~/.config/Claude/claude_desktop_config.json` |
+
+Add the server:
+
+```json
+{
+  "mcpServers": {
+    "live-coding-music": {
+      "command": "live-coding-music-mcp"
+    }
+  }
+}
+```
+
+Restart Claude Desktop. The server appears under the 🔌 plug icon.
+
+#### Claude Code (CLI)
+
+```bash
+# If installed globally
+claude mcp add strudel live-coding-music-mcp
+
+# If built from source
+claude mcp add strudel node /path/to/live-coding-music-mcp/dist/index.js
+```
+
+### 3. Verify the server responds
+
+```bash
+# From a global install
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | live-coding-music-mcp
+
+# From source
+npm run validate
+```
+
+You should see a JSON response listing **26 tools**. If you see fewer, the build is out of date — run `npm run build`.
+
+### 4. Make your first sound
+
+In Claude, ask:
+
+> Initialize Strudel and compose a techno beat.
+
+**What you'll see:** A Chromium window opens (visibly — this is the live editor, not a hidden process) and lands on strudel.cc. Claude calls `init`, then `compose({ style: "techno" })`. A 4-on-the-floor pattern appears in the CodeMirror editor and starts playing through your speakers.
+
+Prefer headless mode (no browser window)? Set `"headless": true` in `config.json` before the first `init` call — see [Configuration](#configuration). Note that audio analysis (tempo / key detection) is more reliable in headed mode; headless audio sampling is best-effort.
+
+### 5. Where to go next
+
+- [Quick Reference](#quick-reference) below: tool cheat sheet for common operations.
+- [Usage Examples](#usage-examples): multi-step workflows (composition, audio analysis, AI-assisted jamming).
+- [`patterns/examples/`](patterns/examples/): 18 ready-to-play patterns across 7 genres plus 4 longform pieces. Agents can browse them via the `strudel://examples` MCP resource without burning tool calls.
+
 ## Quick Reference
 
-Common commands for immediate use:
+Common operations as one-line tool calls:
 
 | Action | Tool call |
 |---|---|
@@ -173,29 +250,8 @@ The legacy single-verb tools (`play`, `stop`, `save`, `undo`, `write`, `generate
 
 **One-shot workflow:**
 ```
-compose with style: "dnb", key: "Am", bpm: 174, auto_play: true
+compose with style: "dnb", key: "Am", tempo: 174, auto_play: true
 ```
-
-## Quick Start
-
-### 1. Add to Claude
-```bash
-# If installed globally
-claude mcp add strudel live-coding-music-mcp
-
-# If built from source
-claude mcp add strudel node /path/to/live-coding-music-mcp/dist/index.js
-```
-
-### 2. Start Using
-```bash
-claude chat
-```
-
-Then ask Claude:
-- "Initialize Strudel and create a techno beat"
-- "Generate a jazz chord progression in F major"
-- "Create a drum & bass pattern at 174 BPM"
 
 ## Available Tools
 
@@ -535,7 +591,7 @@ note("c4 eb4 g4 bb4 c5").struct("1 1 1 1 1 1 1 1")
 
 ## Testing
 
-All tools have been tested with real Strudel.cc interaction:
+Tools are exercised against real Strudel.cc interaction through the browser test suite; those are skipped in CI (require Playwright + audio) but run locally:
 
 ```bash
 # Run integration tests
@@ -556,7 +612,7 @@ node tests/strudel-integration.js
   "strudel_url": "https://strudel.cc/",
   "patterns_dir": "./patterns",
   "audio_analysis": {
-    "fft_size": 2048,
+    "fft_size": 1024,
     "smoothing": 0.8
   }
 }
@@ -564,258 +620,9 @@ node tests/strudel-integration.js
 
 ## Architecture
 
-### System Overview
+The server is a thin MCP dispatcher (`src/server/server.ts`, ~510 lines) over twelve per-domain tool modules (`src/server/tools/*.ts`), six services (MusicTheory, PatternGenerator, SessionManager, AudioCaptureService, GeminiService, MIDIExportService, StrudelEngine), two controllers (StrudelController for Playwright, AudioAnalyzer for Web Audio API), and a JSON-on-disk PatternStore. Browser automation hits the CodeMirror editor on strudel.cc directly via `editor.__view.dispatch(...)` rather than keyboard simulation — about 80% faster.
 
-The Strudel MCP Server is built with a modular architecture that separates concerns and enables robust music generation:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       Claude AI                              │
-│                  (MCP Client)                                │
-└───────────────────────┬─────────────────────────────────────┘
-                        │ MCP Protocol (stdio)
-                        │
-┌───────────────────────▼─────────────────────────────────────┐
-│              StrudelMCPServer                          │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │  Tool Request Handler                                  │ │
-│  │  - Validates inputs                                    │ │
-│  │  - Routes to appropriate service                       │ │
-│  │  - Handles errors gracefully                           │ │
-│  └────────────────────────────────────────────────────────┘ │
-└───────┬────────────┬────────────┬───────────┬──────────────┘
-        │            │            │           │
-   ┌────▼────┐  ┌───▼────┐  ┌───▼────┐  ┌──▼──────┐
-   │ Strudel │  │ Music  │  │Pattern │  │ Pattern │
-   │Controller│  │ Theory │  │Generator│  │  Store  │
-   └────┬────┘  └────────┘  └────────┘  └─────────┘
-        │
-   ┌────▼────────────────────────────┐
-   │   Playwright Browser            │
-   │  ┌──────────────────────────┐   │
-   │  │   Strudel.cc Website     │   │
-   │  │  ┌────────────────────┐  │   │
-   │  │  │  CodeMirror Editor │  │   │
-   │  │  └────────────────────┘  │   │
-   │  │  ┌────────────────────┐  │   │
-   │  │  │  Audio Context     │  │   │
-   │  │  │  + Web Audio API   │  │   │
-   │  │  └────────┬───────────┘  │   │
-   │  └───────────┼──────────────┘   │
-   └──────────────┼──────────────────┘
-                  │
-          ┌───────▼────────┐
-          │ Audio Analyzer │
-          │  - FFT Analysis│
-          │  - Frequency   │
-          │  - Spectral    │
-          └────────────────┘
-```
-
-### Core Components
-
-#### 1. **StrudelMCPServer** (`src/server/server.ts`, ~510 lines)
-
-Thin MCP dispatcher that:
-- Aggregates 26 tool definitions from the per-domain modules in `src/server/tools/`
-- Routes `tools/call` requests to the right module's `execute()`
-- Wraps every response in the discriminated result envelope (`{ ok, errorCategory, isRetryable, ... }`)
-- Tracks initialization, per-session history bundles, per-session audio capture services
-- Advertises and serves MCP resources (`strudel://examples`, etc.)
-- Lazy-initializes the default browser controller on first browser-touching call
-
-Key Features:
-```typescript
-- Pattern caching before browser init
-- Undo/redo stack management
-- Session history tracking
-- Generated pattern storage
-- Safe fallback mechanisms
-```
-
-#### 2. **StrudelController** (`src/StrudelController.ts`)
-
-Browser automation layer using Playwright:
-- **Browser Management**: Chromium instance lifecycle
-- **Editor Control**: CodeMirror manipulation via DOM
-- **Playback Control**: Keyboard shortcuts for play/stop
-- **Performance Optimizations**:
-  - Editor content caching (100ms TTL)
-  - Direct CodeMirror API access
-  - Resource blocking (images, fonts)
-  - Fast DOM content loading
-
-```typescript
-// Example: Optimized pattern writing
-async writePattern(pattern: string) {
-  await this.page.evaluate((newPattern) => {
-    const editor = document.querySelector('.cm-content');
-    const view = editor.__view;
-    view.dispatch({
-      changes: { from: 0, to: view.state.doc.length, insert: newPattern }
-    });
-  }, pattern);
-}
-```
-
-#### 3. **AudioAnalyzer** (`src/AudioAnalyzer.ts`)
-
-Real-time audio analysis via Web Audio API injection:
-- **FFT Analysis**: 1024-point FFT for spectral data
-- **Frequency Bands**: Bass, low-mid, mid, high-mid, treble
-- **Analysis Caching**: 50ms TTL for performance
-- **Features Extracted**:
-  - Average amplitude
-  - Peak frequency
-  - Spectral centroid
-  - Playing state detection
-  - Frequency distribution
-
-```typescript
-Features provided:
-- average: Overall amplitude (0-255)
-- peak: Maximum amplitude
-- peakFrequency: Dominant frequency in Hz
-- bass/mid/treble: Band-specific amplitudes
-- brightness: Timbral classification
-- isPlaying: Boolean playback state
-```
-
-#### 4. **MusicTheory** (`src/services/MusicTheory.ts`)
-
-Music theory engine providing:
-- **15+ Scales**: Major, minor, modes, pentatonic, blues, whole-tone
-- **Chord Progressions**: Pop, jazz, blues, rock, folk, EDM
-- **Euclidean Rhythms**: Mathematical rhythm generation
-- **Arpeggio Generation**: Multiple patterns (up, down, random)
-- **Note Transposition**: Semitone-based pitch shifting
-
-Supported scales:
-```typescript
-major, minor, dorian, phrygian, lydian, mixolydian,
-aeolian, locrian, pentatonic, blues, chromatic,
-wholetone, harmonic_minor, melodic_minor
-```
-
-#### 5. **PatternGenerator** (`src/services/PatternGenerator.ts`)
-
-AI-powered pattern creation:
-- **Genre Templates**: Techno, house, DnB, trap, ambient, jazz, intelligent_dnb, trip_hop, boom_bap
-- **Drum Patterns**: 4 complexity levels per genre
-- **Basslines**: 8 different styles
-- **Melody Generation**: Scale-based with musical intervals
-- **Variations**: Subtle, moderate, extreme, glitch, evolving
-- **Fills**: 1-4 bar drum fills
-
-Example generation:
-```typescript
-generateCompletePattern('techno', 'C', 130)
-→ Multi-layer pattern with drums, bass, chords, melody
-```
-
-#### 6. **PatternStore** (`src/PatternStore.ts`)
-
-Persistent pattern storage:
-- **JSON-based**: Simple file storage
-- **Metadata**: Name, tags, timestamp, audio features
-- **Tag Filtering**: Organize by genre, mood, project
-- **Sorted Retrieval**: Most recent first
-
-### Directory Structure
-
-```
-live-coding-music-mcp/
-├── src/
-│   ├── server/
-│   │   ├── server.ts                    # MCP dispatcher (~510 lines)
-│   │   ├── resources.ts                 # MCP resources (#131)
-│   │   └── tools/
-│   │       ├── ai.ts, analysis.ts, capture.ts, compose.ts,
-│   │       ├── diagnostics.ts, editor.ts, generate.ts, history.ts,
-│   │       ├── playback.ts, session.ts, storage.ts, transform.ts,
-│   │       └── types.ts                 # ToolContext, Envelope, helpers
-│   ├── services/
-│   │   ├── MusicTheory.ts                # Scale/chord/euclidean helpers
-│   │   ├── PatternGenerator.ts           # Template-based generation
-│   │   ├── SessionManager.ts             # Multi-session lifecycle (#108)
-│   │   ├── AudioCaptureService.ts        # Audio recording
-│   │   ├── MIDIExportService.ts          # MIDI export
-│   │   ├── GeminiService.ts              # Gemini API client (ai_assist)
-│   │   ├── StrudelEngine.ts              # @strudel/* wrapper
-│   │   └── StrudelEngineHelpers.ts       # Pure helpers (#107)
-│   ├── utils/
-│   │   ├── Logger.ts
-│   │   ├── PatternValidator.ts           # Syntax + safety checks
-│   │   ├── ErrorRecovery.ts              # Retry / backoff
-│   │   ├── PerformanceMonitor.ts
-│   │   └── InputValidator.ts             # Input bound checks
-│   ├── StrudelController.ts              # Browser automation (~800 lines)
-│   ├── AudioAnalyzer.ts                  # Audio analysis (~800 lines)
-│   ├── PatternStore.ts                   # On-disk pattern persistence
-│   └── index.ts                          # Entry point
-├── src/__tests__/                        # Jest suites (unit + integration + browser)
-├── patterns/
-│   ├── examples/                         # 18 bundled example patterns
-│   └── *.json                            # Saved patterns at runtime
-├── scripts/
-│   ├── generate-tool-docs.ts             # README tool-table generator
-│   └── generate-changelog.ts
-├── config.json                           # Local config (gitignored)
-├── package.json
-└── tsconfig.json
-```
-
-### Data Flow
-
-1. **Tool Invocation**
-   ```
-   Claude → MCP Protocol → StrudelMCPServer
-   ```
-
-2. **Pattern Generation** (without browser)
-   ```
-   Server → PatternGenerator → MusicTheory → Pattern String
-   ```
-
-3. **Pattern Execution** (with browser)
-   ```
-   Server → StrudelController → Playwright → Strudel.cc
-   ```
-
-4. **Audio Analysis**
-   ```
-   Strudel.cc → Web Audio API → AudioAnalyzer → Feature Data
-   ```
-
-### Performance Characteristics
-
-| Operation | Latency | Notes |
-|-----------|---------|-------|
-| Pattern Generation | <100ms | Pure computation |
-| Browser Init | ~3s | One-time cost |
-| Pattern Write | ~50ms | With caching |
-| Play/Stop | ~100ms | Keyboard shortcuts |
-| Audio Analysis | ~20ms | With 50ms cache |
-| Pattern Save | ~10ms | File I/O |
-
-### Optimization Strategies
-
-1. **Caching**
-   - Editor content: 100ms TTL
-   - Audio analysis: 50ms TTL
-   - Generated patterns: Until browser init
-
-2. **Resource Blocking**
-   - Images, fonts, media blocked
-   - Only load essential JavaScript/CSS
-
-3. **Direct API Access**
-   - CodeMirror view manipulation
-   - Keyboard shortcuts over button clicks
-
-4. **Lazy Loading**
-   - Browser starts only when needed
-   - Services initialized on-demand
+For the full breakdown — component diagram, per-component responsibilities, directory layout, data flow, and optimization strategies — see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## Pattern Examples
 
@@ -864,347 +671,15 @@ docker-compose up
 
 ## Development
 
-### Setup Development Environment
-
-```bash
-# Clone the repository
-git clone https://github.com/williamzujkowski/live-coding-music-mcp.git
-cd live-coding-music-mcp
-
-# Install dependencies
-npm install
-
-# Install Playwright browsers
-npx playwright install chromium
-
-# Build the project
-npm run build
-```
-
-### Available Scripts
-
-```bash
-# Development mode with hot reload
-npm run dev
-
-# Build TypeScript to dist/
-npm run build
-
-# Start production server
-npm start
-
-# Run all tests
-npm test
-
-# Run integration tests with real browser
-npm run test:integration
-
-# Run browser-specific tests
-npm run test:browser
-
-# Validate MCP protocol compliance
-npm run validate
-
-# Lint code
-npm run lint
-
-# Format code
-npm run format
-
-# Clean build artifacts
-npm clean
-```
-
-### Publishing to npm
-
-See [NPM_PUBLISHING.md](NPM_PUBLISHING.md) for complete publishing instructions.
-
-**Quick publish via GitHub Release:**
-```bash
-npm version patch  # or minor, major
-git push && git push --tags
-gh release create v$(node -p "require('./package.json').version") --generate-notes
-```
-
-The package uses OIDC trusted publishing with provenance attestation for supply chain security.
-
-### Adding new tools
-
-Tools live in per-domain modules under `src/server/tools/<domain>.ts`. `server.ts` just dispatches. To add a tool:
-
-1. **Pick the right domain module** (or add a new one). Add the tool definition to that module's `tools` array:
-
-   ```typescript
-   export const tools: Tool[] = [
-     // ...
-     {
-       name: 'my_new_tool',
-       description: 'One-line description; agents read this to pick between adjacent tools',
-       inputSchema: {
-         type: 'object',
-         properties: {
-           param1: { type: 'string', description: 'What it is' },
-           session_id: { type: 'string', description: 'Optional session ID (#108)' },
-         },
-         required: ['param1'],
-       },
-     },
-   ];
-   ```
-
-2. **Add the case** to the module's `execute()` switch:
-
-   ```typescript
-   case 'my_new_tool':
-     return await ctx.getController(args.session_id).doSomething(args.param1);
-   ```
-
-3. **Add a service method** if needed (`MusicTheory`, `PatternGenerator`, etc.) and surface it through `ToolContext` (`src/server/tools/types.ts`) if other modules need it.
-
-4. **Don't hand-edit the README tool table.** It auto-generates via `npm run build` → `scripts/generate-tool-docs.ts`. A Jest test plus a CI step guard against drift.
-
-5. **Use the envelope helpers** for returns: `ok(data)`, `empty(data)`, `err('validation', 'message')` from `src/server/tools/types.ts`. Raw returns still work — the dispatcher normalises them — but native envelope construction is clearer.
-
-6. **Build and test**:
-
-   ```bash
-   npm run build
-   echo '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"my_new_tool","arguments":{"param1":"test"}},"id":2}' | node dist/index.js
-   ```
-
-### Testing Strategy
-
-#### 1. Unit Tests
-```bash
-# Run with Jest
-npm test
-
-# Watch mode
-npm run test:watch
-```
-
-#### 2. Integration Tests
-```bash
-# Full integration with real browser
-npm run test:integration
-
-# This tests:
-# - Browser initialization
-# - Pattern generation
-# - Audio analysis
-# - Pattern storage
-# - All 84 registered tools
-```
-
-#### 3. Manual Testing
-```bash
-# Development mode
-npm run dev
-
-# In another terminal
-claude mcp add strudel-dev node $(pwd)/dist/index.js
-claude chat
-
-# Then interact with Claude
-```
-
-### Code Quality
-
-**TypeScript Configuration**
-```json
-// tsconfig.json
-{
-  "compilerOptions": {
-    "strict": true,           // Strict type checking
-    "esModuleInterop": true,  // Better module compatibility
-    "target": "ES2020",       // Modern JavaScript
-    "module": "ES2020",       // ES modules
-    "moduleResolution": "node"
-  }
-}
-```
-
-**Linting & Formatting**
-```bash
-# ESLint
-npm run lint
-
-# Prettier
-npm run format
-
-# Pre-commit hooks recommended
-```
-
-### Debugging
-
-**Enable Debug Logging**
-```bash
-# Set DEBUG environment variable
-DEBUG=strudel:* npm start
-
-# Or specific modules
-DEBUG=strudel:controller npm start
-DEBUG=strudel:audio npm start
-```
-
-**VS Code Launch Configuration**
-```json
-{
-  "type": "node",
-  "request": "launch",
-  "name": "Debug MCP Server",
-  "program": "${workspaceFolder}/dist/index.js",
-  "preLaunchTask": "npm: build",
-  "console": "integratedTerminal",
-  "env": {
-    "DEBUG": "strudel:*"
-  }
-}
-```
-
-**Playwright Debugging**
-```typescript
-// In StrudelController.ts
-this.browser = await chromium.launch({
-  headless: false,  // See the browser
-  devtools: true,   // Open DevTools
-  slowMo: 100       // Slow down actions
-});
-```
-
-### Performance Monitoring
-
-The server includes built-in performance monitoring:
-
-```typescript
-// Access performance metrics
-You: Show me performance metrics
-
-Claude: Performance Report:
-{
-  "averageLatency": {
-    "init": "3.2s",
-    "write": "52ms",
-    "play": "105ms",
-    "analyze": "18ms"
-  },
-  "cacheHitRate": "85%",
-  "totalOperations": 1247,
-  "bottlenecks": [
-    {"tool": "init", "avgTime": 3200, "calls": 1},
-    {"tool": "write", "avgTime": 52, "calls": 156}
-  ]
-}
-```
-
-### Contributing Guidelines
-
-1. **Fork the repository**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/live-coding-music-mcp.git
-   ```
-
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/my-new-feature
-   ```
-
-3. **Make your changes**
-   - Follow existing code style
-   - Add tests for new features
-   - Update documentation
-   - Ensure all tests pass
-
-4. **Commit with meaningful messages**
-   ```bash
-   git commit -m "feat: Add support for custom scale generation"
-   ```
-
-   Follow [Conventional Commits](https://www.conventionalcommits.org/):
-   - `feat:` New feature
-   - `fix:` Bug fix
-   - `docs:` Documentation changes
-   - `refactor:` Code refactoring
-   - `test:` Adding tests
-   - `chore:` Maintenance tasks
-
-5. **Push and create PR**
-   ```bash
-   git push origin feature/my-new-feature
-   ```
-
-   Then create a Pull Request on GitHub with:
-   - Clear description of changes
-   - Link to related issues
-   - Screenshots/examples if relevant
-
-### Release Process
-
-```bash
-# 1. Update version in package.json
-npm version patch  # or minor/major
-
-# 2. Update CHANGELOG.md
-# Add entry for new version
-
-# 3. Build and test
-npm run build
-npm test
-npm run test:integration
-
-# 4. Commit version bump
-git add .
-git commit -m "chore: Bump version to X.Y.Z"
-
-# 5. Create git tag
-git tag vX.Y.Z
-
-# 6. Push to GitHub
-git push origin main --tags
-
-# 7. Publish to npm (if you have access)
-npm publish --access public
-
-# 8. Create GitHub release
-gh release create vX.Y.Z --generate-notes
-```
-
-### Docker Development
-
-```bash
-# Build development image
-docker build -t live-coding-music-mcp:dev .
-
-# Run with volume mount for hot reload
-docker run -it --rm \
-  -v $(pwd)/src:/app/src \
-  -v $(pwd)/patterns:/app/patterns \
-  live-coding-music-mcp:dev
-
-# Run tests in container
-docker run -it --rm live-coding-music-mcp:dev npm test
-```
-
-### Environment Variables
-
-```bash
-# Logging level
-LOG_LEVEL=debug        # debug, info, warn, error
-
-# Performance monitoring
-ENABLE_PERF_MONITORING=true
-
-# Pattern storage
-PATTERNS_DIR=./patterns
-
-# Browser configuration
-HEADLESS=false
-BROWSER_TIMEOUT=15000
-
-# Audio analysis
-FFT_SIZE=1024
-SMOOTHING=0.8
-```
+For development setup, scripts, debugging, adding new tools, and the release process, see **[DEVELOPMENT.md](DEVELOPMENT.md)**.
+
+Quick links:
+- [Setup](DEVELOPMENT.md#setup) — `git clone` to `npm test`
+- [Adding new tools](DEVELOPMENT.md#adding-new-tools) — module pattern + envelope helpers
+- [Release process](DEVELOPMENT.md#release-process) — `gh release create` triggers the publish workflow
+- [Contributing](DEVELOPMENT.md#contributing) — commit conventions and PR flow
+
+The [Configuration](#configuration) section above covers runtime config (`config.json`). [ARCHITECTURE.md](ARCHITECTURE.md) covers the system design.
 
 ## Performance
 
@@ -1522,7 +997,7 @@ claude chat
    - Use resource blocking (enabled by default)
 
 #### Patterns not saving
-**Symptom**: `save` command fails or patterns don't persist
+**Symptom**: `pattern_store({ action: "save" })` fails or patterns don't persist
 
 **Solutions**:
 ```bash
@@ -1590,7 +1065,7 @@ Claude: Browser state:
 - Initialized: true
 - Cached patterns: 2
 - Undo stack depth: 5
-- Last operation: write_pattern (2.5s ago)
+- Last operation: edit_pattern (2.5s ago)
 ```
 
 **Validate Pattern Syntax**
@@ -1615,33 +1090,11 @@ If you encounter issues not covered here:
 
 ## 🤝 Contributing
 
-**We need your help!** This project is actively developed and welcomes contributions of all kinds:
+PRs welcome — bug fixes, docs, tests, new tools. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the contribution guide and **[DEVELOPMENT.md](DEVELOPMENT.md)** for setup and workflow.
 
-### Ways to Contribute
-- **Report Bugs**: Found an issue? [Open a bug report](https://github.com/williamzujkowski/live-coding-music-mcp/issues/new)
-- **Suggest Features**: Have ideas? [Create a feature request](https://github.com/williamzujkowski/live-coding-music-mcp/issues/new)
-- **Improve Docs**: Fix typos, add examples, clarify confusing sections
-- **Write Tests**: Help us improve test coverage
-- **Fix Issues**: Check [open issues](https://github.com/williamzujkowski/live-coding-music-mcp/issues) for bugs to fix
-- **Add Features**: Implement new tools or improve existing ones
+For non-trivial work, open a GitHub issue first ([issue policy in CLAUDE.md](CLAUDE.md#github-issues-workflow)). For typos and small fixes, a PR directly is fine.
 
-### Quick Start for Contributors
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes and add tests
-4. Ensure tests pass (`npm test`)
-5. Commit with clear messages (`git commit -m 'fix: resolve audio analysis bug'`)
-6. Push to your fork (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-**First time contributor?** Look for issues labeled `good-first-issue` or `help-wanted`.
-
-### Feedback Welcome
-- Questions? Open a [Discussion](https://github.com/williamzujkowski/live-coding-music-mcp/discussions)
-- Found something confusing? Tell us!
-- Have a use case we haven't considered? Share it!
-
-We review PRs promptly and welcome contributors of all skill levels. See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions.
+[GitHub Discussions](https://github.com/williamzujkowski/live-coding-music-mcp/discussions) are open for use-case questions and design conversations.
 
 ## 📄 License
 
@@ -1649,14 +1102,14 @@ We review PRs promptly and welcome contributors of all skill levels. See [DEVELO
 
 This project depends on `@strudel/core`, `@strudel/mini`, `@strudel/tonal`, and `@strudel/transpiler`, which are AGPL-3.0 licensed by the upstream [Strudel project](https://codeberg.org/uzu/strudel). Since we `import` from those packages and redistribute the combined work via npm, this project must be distributed under the same copyleft terms. If you fork or redistribute, you must keep the AGPL license and provide source access to any network-accessible users (AGPL §13).
 
-Earlier versions of this package (including `@williamzujkowski/strudel-mcp-server` prior to deprecation) shipped with an MIT declaration — that was incorrect given the AGPL dependencies. v2.0.0 of `@williamzujkowski/live-coding-music-mcp` corrects the license to AGPL-3.0-or-later. v1.0.0 of this package is deprecated; install v2.0.0 or later.
+Earlier versions of this package (including `@williamzujkowski/strudel-mcp-server` prior to deprecation) shipped with an MIT declaration — that was incorrect given the AGPL dependencies. v2.0.0 of `@williamzujkowski/live-coding-music-mcp` corrects the license to AGPL-3.0-or-later. v1.0.0 of this package is deprecated; install v2.0.0 or later (current: v4.0.0).
 
 ## 🙏 Acknowledgments
 
-- [Strudel.cc](https://strudel.cc) - Amazing live coding environment
-- [TidalCycles](https://tidalcycles.org) - Pattern language inspiration
-- [Anthropic](https://anthropic.com) - Claude AI and MCP protocol
-- [Playwright](https://playwright.dev) - Reliable browser automation
+- [Strudel.cc](https://strudel.cc) — pattern-based live coding environment (this project is a fan adapter, not affiliated)
+- [TidalCycles](https://tidalcycles.org) — original pattern language Strudel descends from
+- [Anthropic](https://anthropic.com) — Claude and the MCP protocol
+- [Playwright](https://playwright.dev) — browser automation
 
 ---
 
