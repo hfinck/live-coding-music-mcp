@@ -2,7 +2,7 @@
  * StrudelEngine - Local Strudel pattern engine for Node.js
  *
  * Executes Strudel patterns without browser automation.
- * Uses @strudel/core, @strudel/mini, and @strudel/transpiler for:
+ * Uses @strudel/core, @strudel/mini, @strudel/tonal, and @strudel/transpiler for:
  * - Pattern validation with precise error locations
  * - Event querying for pattern analysis
  * - Syntax checking without browser overhead
@@ -15,6 +15,10 @@
 
 import * as strudelCore from '@strudel/core';
 import { mini } from '@strudel/mini';
+// Importing @strudel/tonal registers .scale/.chord/.voicing/.transpose as Pattern
+// methods. Without it, local validation rejects `n("0 2 4").scale("D:minor")` -
+// an everyday idiom that runs fine in the browser REPL - as an unknown function.
+import * as strudelTonal from '@strudel/tonal';
 import { transpiler } from '@strudel/transpiler';
 import {
   calculateComplexity,
@@ -134,6 +138,7 @@ export class StrudelEngine {
     // Build execution context with all Strudel functions
     this.context = {
       ...strudelCore,
+      ...strudelTonal,
       m: mini,
       mini,
     };

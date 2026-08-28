@@ -29,3 +29,7 @@ declare module '@strudel/transpiler' {
   }
   export function transpiler(code: string): TranspilerResult;
 }
+
+// Shorthand ambient declaration: @strudel/tonal ships no types, and it is used
+// only to populate the evaluation context and register Pattern methods.
+declare module '@strudel/tonal';
