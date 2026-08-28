@@ -1,5 +1,6 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
@@ -509,6 +510,21 @@ export class StrudelMCPServer {
     return service;
   }
 
+  /**
+   * Connects this server to a transport. Used by the HTTP entrypoint
+   * (src/http.ts), which owns one server instance per MCP session; `run()`
+   * remains the stdio path for local clients.
+   */
+  async connect(transport: Transport) {
+    await this.server.connect(transport);
+  }
+
+  /** Releases the browser and session resources this server holds. */
+  async shutdown() {
+    await this.controller.cleanup();
+    await this.sessionManager.destroyAll();
+  }
+
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -516,8 +532,7 @@ export class StrudelMCPServer {
 
     process.on('SIGINT', async () => {
       this.logger.info('Shutting down...');
-      await this.controller.cleanup();
-      await this.sessionManager.destroyAll();
+      await this.shutdown();
       process.exit(0);
     });
   }

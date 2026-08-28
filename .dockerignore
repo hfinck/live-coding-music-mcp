@@ -29,7 +29,7 @@ docs
 # Development files
 .eslintrc.json
 .prettierrc
-tsconfig.json
+# tsconfig.json is NOT ignored: the builder stage copies it to compile src/.
 
 # Local config (may have different settings)
 config.json

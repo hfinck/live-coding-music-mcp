@@ -9,10 +9,12 @@ COPY package*.json ./
 # Install all dependencies (needed for build)
 RUN npm ci --ignore-scripts
 
-# Copy source and build
+# Copy source and build.
+# `npm run build` also regenerates README.md via scripts/generate-tool-docs.ts,
+# which is a dev-time docs task and is not part of the image, so compile directly.
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npx tsc
 
 # Prune dev dependencies to reduce size
 RUN npm prune --production && \
@@ -44,5 +46,8 @@ RUN mkdir -p patterns
 # Create default config for headless mode in container
 RUN echo '{"headless":true}' > config.json
 
+# Hosted deployments talk MCP over Streamable HTTP (dist/http.js); local clients
+# spawn the stdio entrypoint (dist/index.js) directly.
+ENV PORT=3000
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/http.js"]

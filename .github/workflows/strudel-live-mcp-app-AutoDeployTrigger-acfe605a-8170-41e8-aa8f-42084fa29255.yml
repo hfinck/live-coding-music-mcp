@@ -1,28 +1,36 @@
 name: Trigger auto deployment for strudel-live-mcp-app
 
-# When this action will be executed
-on:
-  # Automatically trigger it when detected changes in repo
-  push:
-    branches: 
-      [ main ]
-    paths:
-    - '**'
-    - '.github/workflows/strudel-live-mcp-app-AutoDeployTrigger-acfe605a-8170-41e8-aa8f-42084fa29255.yml'
+# The portal-generated version of this workflow could not run: registryUrl was
+# empty and the placeholder keys (_dockerfilePathKey_, _targetLabelKey_,
+# _buildArgumentsKey_) were never substituted, so the deploy action fell back to
+# an auto-named registry that does not exist:
+#   ERROR: (ParentResourceNotFound) ... registries/ca05db972a97acr could not be found
+# It now builds in ACR and updates the container app explicitly.
 
-  # Allow manual trigger 
-  workflow_dispatch:      
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: EDayArchitectureSandboxRG
+  CONTAINER_APP: strudel-live-mcp-app
+  REGISTRY: edaystrudelmcp
+  IMAGE: live-coding-music-mcp
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    permissions: 
-      id-token: write #This is required for requesting the OIDC JWT Token
-      contents: read #Required when GH token is used to authenticate with private repo
+    permissions:
+      id-token: write # required for requesting the OIDC JWT token
+      contents: read
 
     steps:
       - name: Checkout to the branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Azure Login
         uses: azure/login@v2
@@ -31,19 +39,40 @@ jobs:
           tenant-id: ${{ secrets.STRUDELLIVEMCPAPP_AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.STRUDELLIVEMCPAPP_AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and push container image to registry
-        uses: azure/container-apps-deploy-action@v2
+      - name: Build image in ACR
+        uses: azure/cli@v2
         with:
-          appSourcePath: ${{ github.workspace }}
-          _dockerfilePathKey_: _dockerfilePath_
-          _targetLabelKey_: _targetLabel_
-          registryUrl: 
-          registryUsername: ${{ secrets.STRUDELLIVEMCPAPP_REGISTRY_USERNAME }}
-          registryPassword: ${{ secrets.STRUDELLIVEMCPAPP_REGISTRY_PASSWORD }}
-          containerAppName: strudel-live-mcp-app
-          resourceGroup: EDayArchitectureSandboxRG
-          imageToBuild: default/[parameters('containerAppName')]:${{ github.sha }}
-          _buildArgumentsKey_: |
-            _buildArgumentsValues_
+          azcliversion: latest
+          inlineScript: |
+            az acr build \
+              --registry "$REGISTRY" \
+              --image "$IMAGE:${{ github.sha }}" \
+              --image "$IMAGE:latest" \
+              --file Dockerfile .
 
+      - name: Deploy revision to Container Apps
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az containerapp update \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$CONTAINER_APP" \
+              --image "$REGISTRY.azurecr.io/$IMAGE:${{ github.sha }}"
 
+      - name: Verify the MCP endpoint answers
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            FQDN=$(az containerapp show -g "$RESOURCE_GROUP" -n "$CONTAINER_APP" \
+              --query properties.configuration.ingress.fqdn -o tsv)
+            for attempt in $(seq 1 20); do
+              if curl -fsS -m 15 "https://$FQDN/health" > /tmp/health.json; then
+                cat /tmp/health.json
+                exit 0
+              fi
+              sleep 15
+            done
+            echo "MCP server did not become healthy at https://$FQDN/health"
+            exit 1
